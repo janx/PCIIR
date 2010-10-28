@@ -49,6 +49,25 @@ def pearson(v1, v2)
 end
 
 
+# The Pearson correlation works well for the blog dataset where the values
+# are actual word counts. However, this dataset just has 1s and 0s for
+# presence or absence, and it would be more useful to define some measure
+# of overlap between the people who want two items. For this, there is
+# a measure called the Tanimoto coefficient, which is the ratio of the
+# intersection set (only the items that are in both sets) to the union set
+# (all the items in either set).
+def tanamoto(v1, v2)
+  c1, c2, shr = 0, 0, 0
+
+  v1.size.times do |i|
+    c1 += 1 if v1[i] != 0
+    c2 += 1 if v2[i] != 0
+    shr += 1 if v1[i] != 0 && v2[i] != 0
+  end
+
+  return 1.0 - (shr.to_f/(c1+c2-shr))
+end
+
 # Each cluster in a hierarchical clustering algorithm is either a point in the tree with
 # two branches, or an endpoint associated with an actual row from the dataset (in this
 # case, a blog). Each cluster also contains data about its location, which is either the
@@ -207,6 +226,12 @@ def kmeans_main
   blognames,words,data=readfile('blogdata.txt')
   cluster = kcluster(data, :pearson, 10)
   p cluster.map {|ids| ids.inject([]) {|names, id| names << blognames[id]; names}}
+end
+
+def zebo_main
+  wants,people,data=readfile('zebo.txt')
+  cluster = hcluster(data,:tanamoto)
+  draw_dendrogram(cluster,wants)
 end
 
 def get_height(cluster)
