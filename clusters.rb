@@ -133,12 +133,80 @@ def print_cluster(cluster, opt={ })
   print_cluster(cluster.right, opt) if cluster.right
 end
 
+def kcluster(rows, distance=:pearson, k=4)
+  return unless rows.size > 0
+  ranges = (0...rows.first.size).map {|i|
+    rows_at_i = rows.map {|r| r[i]}
+    [rows_at_i.min, rows_at_i.max]
+  }
+
+  clusters = (0...k).map {|j|
+    (0...rows.first.size).map {|i|
+      rand*(ranges[i][1]-ranges[i][0]) + ranges[i][0]
+    }
+  }
+
+  last_matches = nil
+  best_matches = nil
+  100.times do |t|
+    puts "Iteration #{t}"
+
+    # Quiz: best_matches = Array.new(k, []) doesn't work here
+    # do u know why? ;)
+    best_matches = []
+    k.times { best_matches << [] }
+
+    rows.each_with_index do |row, j|
+      best_match = 0
+      best_match_score = 99999
+
+      k.times do |i|
+        d = send(distance, clusters[i], row)
+        if d < best_match_score
+          best_match = i
+          best_match_score = d
+        end
+      end
+
+      best_matches[best_match] << j
+    end
+
+    break if best_matches == last_matches
+    last_matches = best_matches
+
+    k.times do |i|
+      avgs = Array.new(rows.first.size, 0.0)
+
+      if best_matches[i].size > 0
+        best_matches[i].each do |row_id|
+          rows[row_id].each_with_index do |v, j|
+            avgs[j] += v
+          end
+        end
+
+        avgs.map {|v| v /= best_matches[i].size}
+
+        clusters[i] = avgs
+      end
+    end
+  end
+
+  best_matches
+end
+
+# run main in your irb
 def main
   blognames,words,data=readfile('blogdata.txt')
 #  data = rotate_matrix(data)
   cluster = hcluster(data)
 #  print_cluster cluster, :labels => blognames
   draw_dendrogram(cluster, blognames)
+end
+
+def kmeans_main
+  blognames,words,data=readfile('blogdata.txt')
+  cluster = kcluster(data, :pearson, 10)
+  p cluster.map {|ids| ids.inject([]) {|names, id| names << blognames[id]; names}}
 end
 
 def get_height(cluster)
