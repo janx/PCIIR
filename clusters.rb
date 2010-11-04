@@ -234,6 +234,12 @@ def zebo_main
   draw_dendrogram(cluster,wants)
 end
 
+def to2d_main
+  blognames,words,data=readfile('blogdata.txt')
+  coords = scaledown(data)
+  draw2d(coords, blognames, 'blogs2d.jpg')
+end
+
 def get_height(cluster)
   return 1 unless cluster.left || cluster.right
   return get_height(cluster.left) + get_height(cluster.right)
@@ -290,4 +296,79 @@ def draw_node(draw, cluster, x, y, scaling, labels)
     draw.fill("#000000")
     draw.text(x+5, y, labels[cluster.id])
   end
+end
+
+def scaledown(data, distance=:pearson, rate=0.01)
+  real_distances = []
+  data.size.times { real_distances << [] }
+  0.upto(data.size - 1) do |i|
+    i.upto(data.size - 1) do |j|
+      puts "calculating real distance between #{i} and #{j} ..."
+      dist = send(distance, data[i], data[j])
+      real_distances[i][j] = real_distances[j][i] = dist
+    end
+  end
+
+  outer_sum = 0.0
+
+  # randomly initialize the starting points of the locations in 2D
+  locations = data.map {|vec| [rand, rand]}
+  fake_distances = data.map {|vec| Array.new(data.size, 0.0) }
+
+  last_error = nil
+  1000.times do
+    0.upto(data.size - 1) do |i|
+      i.upto(data.size - 1) do |j|
+        dist = Math.sqrt [(locations[i][0] - locations[j][0])**2, (locations[i][1] - locations[j][1])**2].inject(0.0, &:+)
+        fake_distances[i][j] = fake_distances[j][i] = dist
+      end
+    end
+
+    grad = data.map {|vec| [0.0, 0.0]}
+
+    total_error = 0
+    data.size.times do |k|
+      data.size.times do |j|
+        next if j == k
+
+        error_term = (fake_distances[j][k] - real_distances[j][k]) / real_distances[j][k]
+
+        # Each point needs to be moved away from or towards the other
+        # point in proportion to how much error it has
+        grad[k][0] += ((locations[k][0] - locations[j][0])/fake_distances[j][k]) * error_term
+        grad[k][1] += ((locations[k][1] - locations[j][1])/fake_distances[j][k]) * error_term
+
+        total_error += error_term.abs
+      end
+    end
+    puts total_error
+
+    break if last_error && last_error < total_error
+    last_error = total_error
+
+    data.size.times do |i|
+      locations[i][0] -= rate*grad[i][0]
+      locations[i][1] -= rate*grad[i][1]
+    end
+  end
+
+  locations
+end
+
+def draw2d(data, labels, file='mds2d.jpg')
+  image = Image.new(2000, 2000) {
+    self.background_color = "white"
+  }
+
+  gc = Draw.new
+  gc.fill("#000000")
+
+  data.size.times do |i|
+    x = (data[i][0] + 0.5) * 1000
+    y = (data[i][1] + 0.5) * 1000
+    gc.text x, y, labels[i]
+  end
+
+  gc.draw(image)
+  image.display
 end
